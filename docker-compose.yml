@@ -1,0 +1,79 @@
+version: '3.3'
+
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.9.2
+    container_name: elasticsearch-7.9.2
+    restart: always
+    environment:
+      - node.name=es-mqtt
+      - cluster.name=es-mqtt-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - network.host=0.0.0.0
+      - http.port=9200
+      - xpack.security.enabled=false
+      - discovery.type=single-node
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536 # maximum number of open files for the Elasticsearch user, set to at least 65536 on modern systems
+        hard: 65536
+    volumes:
+      - /opt/mqtt-es/elasticsearch/data:/usr/share/elasticsearch/data
+      - /opt/mqtt-es/elasticsearch/logs:/usr/share/elasticsearch/logs
+    ports:
+      - 920O:9200
+    network_mode: "host"
+
+  kibana:
+    depends_on:
+      - elasticsearch
+    image: docker.elastic.co/kibana/kibana:7.9.2
+    container_name: kibana-7.9.2
+    restart: always
+    environment:
+      SERVER_NAME: kibana.docker.local
+      ELASTICSEARCH_HOSTS: '["http://localhost:9200"]'
+    ports:
+      - 5601:5601
+    network_mode: "host"
+    
+  filebeat:
+    depends_on:
+      - elasticsearch
+      - activemq
+    image: docker.elastic.co/beats/filebeat:7.9.2
+    container_name: filebeat-7.9.2
+    restart: always
+    # Need to override user so we can access the log files, and docker.sock
+    user: root
+    network_mode: "host"
+    volumes:
+      - /opt/mqtt-es/filebeat/config/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+    network_mode: "host"
+    # disable strict permission checks
+    command: ["--strict.perms=false"]
+
+  activemq:
+    image: synapticiel/activemq:5.16.0
+    container_name: activemq-5.16.0
+    ports:
+      # mqtt
+      - "1883:1883"
+      # amqp
+      - "5672:5672"
+      # ui
+      - "8161:8161"
+      # stomp
+      - "61613:61613"
+      # ws
+      - "61614:61614"
+      # jms/openwire
+      - "61616:61616"
+    volumes:
+      - /opt/mqtt-es/active-mq/data:/opt/apache-activemq/data
+      - /opt/mqtt-es/active-mq/conf:/opt/apache-activemq/cong
+    network_mode: "host"

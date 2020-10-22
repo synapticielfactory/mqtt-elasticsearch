@@ -1,0 +1,45 @@
+filebeat.inputs:
+  - type: mqtt
+    hosts:
+      - 'tcp://127.0.0.1:1883'
+    topics:
+      - sensor-data
+    qos: 2
+    client_id: filebeat_mqtt
+    username: system
+    password: manager
+    tags:
+      - mqtt
+      - iot
+      - filebeat
+      - broker
+      - gps
+    enabled: true
+    fields_under_root: true
+    fields:
+      event.dataset: sensor-data
+      event.module: filebeat-mqtt
+      event.outcome: iot-sensors
+      event.category: sensor
+    processors:
+      - decode_json_fields:
+          fields:
+            - message
+          process_array: false
+          max_depth: 1
+          target: ''
+          overwrite_keys: false
+          add_error_key: true
+      - add_host_metadata:
+          when.not.contains.tags: forwarded
+      - add_cloud_metadata: null
+    keep_null: false
+    index: 'sensor-data-%{+yyyy-MM-dd}'
+    pipeline: sensor-data-geo
+setup.template.settings:
+  index.number_of_shards: 1
+  index.number_of_replicas: 0
+  index.codec: best_compression
+output.elasticsearch:
+  hosts:
+    - 'localhost:9200'
